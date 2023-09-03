@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DLL Decompiler</title>
+    <script src="./lib/jquery/dist/jquery.min.js"></script>
+    <style>
+        body {font-family: 'Arial', sans-serif;background-color: #f5f5f5;padding: 10px;}
+        #fileLinks {background: #ffffff;border-radius: 5px;box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);}
+        #fileLinks a {color: #333;text-decoration: none;display: block;border-bottom: 1px solid #e7e7e7;transition: background 0.2s;}
+        #loading {background-color: #eeeeee;color: #333;padding: 5px 10px;border-radius: 3px;margin-top: 10px;}
+        button {background-color: #ddd;border: 1px solid #ccc;color: #333;padding: 5px 10px;font-size: 14px;margin-left: 5px;cursor: pointer;border-radius: 3px;transition: background-color 0.2s;}
+        button:hover {background-color: #ccc;}
+    </style>
+</head>
+
+<body>
+    <label for="apiEndpoint">API Endpoint:</label>
+    <input type="text" id="apiEndpoint" style="width:500px"/>
+    <br/>
+    <input type="file" id="fileInput">
+    <button id="decodeButton">Decode</button>
+    <div id="loading" style="display: none;">Loading...<br></div>
+    <div id="fileLinks"></div>
+    
+    <script>
+        $(document).ready(function () {
+            const defaultApiEndpoint = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/getfiles`;
+            $('#apiEndpoint').val(defaultApiEndpoint);
+        });
+    
+        $('#decodeButton').on('click', function () {
+            const fileInput = $('#fileInput')[0];
+            const apiEndpoint = $('#apiEndpoint').val();
+    
+    
+            if (!fileInput.files.length) {
+                alert('Please select a file!');
+                return;
+            }
+    
+            const file = fileInput.files[0];
+    
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+    
+            reader.onload = function () {
+                const base64String = reader.result.split(",")[1];
+    
+                $('#loading').show();
+    
+                $.ajax({
+                    url: apiEndpoint,
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        Base64String: base64String
+                    }),
+                    success: function (response) {
+                        let linksArray = [];
+                        $.each(response.data, function (_, group) {
+                            $.each(group.files, function (_, file) {
+                                let linkData = {
+                                    name: `${group.name}.${file.name}`,
+                                    html: `<a href="javascript:void(0);" onclick="openFileContent('${file.name}', '${file.content}')">${group.name}.${file.name}</a>`
+                                };
+                                linksArray.push(linkData);
+                            });
+                        });
+                        linksArray.sort((a, b) => a.name.localeCompare(b.name));
+                        let htmlContent = '';
+                        linksArray.forEach(link => {
+                            htmlContent += link.html;
+                        });
+    
+                        $('#loading').hide();
+                        $('#fileLinks').html(htmlContent);
+                    },
+                    error: function (error) {
+                        $('#loading').hide();
+                        $('#output').text('Error: ' + error.responseText);
+                    }
+                });
+            };
+    
+            reader.onerror = function (error) {
+                console.log('Error: ', error);
+            };
+        });
+    
+        function openFileContent(fileName, base64Content) {
+            const decodedContent = atob(base64Content);
+            localStorage.setItem('fileContent', decodedContent);
+            localStorage.setItem('fileName', fileName);
+            window.open('filecontent.html', '_blank');
+        }
+    </script>
+</body>
+
+</html>
